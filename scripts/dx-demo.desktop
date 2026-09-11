@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DEEPX Demo
+Name[zh_CN]=DEEPX 演示中心
+Comment=Start the DEEPX AI Demo Hub
+Comment[zh_CN]=双击启动 DEEPX 演示中心
+Exec=/home/teamhd/dx-demo/scripts/start_launcher_desktop.sh
+Icon=/home/teamhd/dx-demo/launcher/assets/deepx-icon.png
+Path=/home/teamhd/dx-demo
+Terminal=false
+StartupNotify=true
+Categories=Utility;
+StartupWMClass=main.py

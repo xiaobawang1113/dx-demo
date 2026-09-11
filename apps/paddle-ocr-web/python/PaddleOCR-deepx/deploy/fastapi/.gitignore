@@ -1,0 +1,18 @@
+# Test outputs
+test_outputs/
+*.pyc
+__pycache__/
+.pytest_cache/
+*.log
+
+# Coverage reports
+htmlcov/
+.coverage
+*.cover
+
+# Test reports
+report.html
+report.json
+
+# Program generated files
+deepx_env.sh
