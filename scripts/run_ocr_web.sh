@@ -3,6 +3,11 @@
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="${ROOT_DIR}/apps/paddle-ocr-web"
 
+if [ -f "${ROOT_DIR}/toolchain.env" ]; then
+    # shellcheck disable=SC1091
+    source "${ROOT_DIR}/toolchain.env"
+fi
+
 # Load top-level configuration
 if [ -f "${ROOT_DIR}/config.sh" ]; then
     source "${ROOT_DIR}/config.sh"
@@ -22,11 +27,18 @@ OCR_HEALTH_URL="${OCR_API_URL%/api/v1/ocr}/health"
 # app.py pins server_port=7860 in demo.launch(), so the port is not configurable
 WEB_URL="http://localhost:7860"
 
-# Auto-setup on first run: build.sh clones the repos and creates both venvs
-if [ ! -f "${WEB_DIR}/app.py" ] || [ ! -x "${VENV_DIR}/bin/python" ]; then
+# Auto-setup on first run. Vendored sources are in git; still need venvs +
+# dx-engine 3.3.0 + server .dxnn. Prefer scripts/setup_repro.sh on a new board.
+if [ ! -f "${WEB_DIR}/app.py" ] || [ ! -x "${VENV_DIR}/bin/python" ] || [ ! -x "${FASTAPI_DIR}/venv/bin/python" ]; then
     echo "Web demo environment not found. Running python/build.sh ..."
-    if ! "${PY_DIR}"/build.sh; then
-        echo "Error: setup failed. See apps/paddle-ocr-web/python/README.md"
+    _dx_rt_arg=()
+    if [ -d "${PY_DIR}/.cache/dx_rt-3.3.0/python_package" ]; then
+        _dx_rt_arg=(--dx_rt "${PY_DIR}/.cache/dx_rt-3.3.0")
+    elif [ -n "${DX_RT_PATH:-}" ]; then
+        _dx_rt_arg=(--dx_rt "${DX_RT_PATH}")
+    fi
+    if ! "${PY_DIR}"/build.sh "${_dx_rt_arg[@]}"; then
+        echo "Error: setup failed. On a new machine run: ${ROOT_DIR}/scripts/setup_repro.sh"
         read -t 3 -p "Press enter to exit..." || true
         exit 1
     fi

@@ -14,5 +14,4 @@ htmlcov/
 report.html
 report.json
 
-# Program generated files
-deepx_env.sh
+# deepx_env.sh is committed with M1-safe TASK_MAX_LOAD=1 (python/build.sh rewrites it).

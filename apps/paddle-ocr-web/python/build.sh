@@ -7,6 +7,11 @@ set -e
 # Usage: ./build.sh [--dx_rt PATH] [--cpu-only] [--clean] [--help]
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+if [ -f "${REPO_ROOT}/toolchain.env" ]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/toolchain.env"
+fi
 
 WEB_REPO="https://github.com/DEEPX-AI/PP-OCRv5_Online_demo-deepx.git"
 SERVER_REPO="https://github.com/DEEPX-AI/PaddleOCR-deepx.git"
@@ -227,59 +232,52 @@ fi
 # itself is expected to be installed already (dxrt-cli -s works). Building
 # dx_rt from source is what makes upstream local_deepx_setup.sh require sudo,
 # and it is unnecessary here.
+find_libdxrt_prefix() {
+    local candidate
+    for candidate in \
+        "${DXRT_INSTALLED_DIR}" \
+        /usr/local \
+        /usr \
+        "${HOME}/deepx-2.3.0/dx-all-suite" \
+        /home/t/deepx-2.3.0/dx-all-suite \
+        "${HOME}/dx-all-suite" \
+        /opt/deepx
+    do
+        if [ -n "${candidate}" ] && [ -e "${candidate}/lib/libdxrt.so" ]; then
+            echo "${candidate}"
+            return
+        fi
+    done
+    if [ -e /usr/local/lib/libdxrt.so ]; then
+        echo /usr/local
+        return
+    fi
+    if [ -e /usr/lib/libdxrt.so ]; then
+        echo /usr
+        return
+    fi
+}
+
 find_dx_rt() {
     local candidate
     for candidate in \
         "${DX_RT_PATH}" \
+        "${SCRIPT_DIR}/.cache/dx_rt-3.3.0" \
         "${HOME}/Desktop/deepx/SDK/dx-all-suite/dx-runtime/dx_rt" \
         "${HOME}/deepx/SDK/dx-all-suite/dx-runtime/dx_rt" \
         "${HOME}/dx-all-suite/dx-runtime/dx_rt" \
         "/opt/deepx/dx_rt"; do
-        if [ -n "${candidate}" ] && [ -f "${candidate}/python_package/pyproject.toml" ]; then
+        if [ -n "${candidate}" ] && { [ -f "${candidate}/python_package/pyproject.toml" ] || [ -f "${candidate}/python_package/setup.py" ]; }; then
             echo "${candidate}"
             return
         fi
     done
 }
 
-setup_npu() {
-    if [ ! -f /usr/local/lib/libdxrt.so ] && [ ! -f /usr/lib/libdxrt.so ]; then
-        echo "Skipping NPU setup: libdxrt.so not found (DX-RT is not installed)."
-        echo "  Install DX-RT first (dx_rt/build.sh, needs sudo), then re-run this script."
-        return
-    fi
-
-    local dx_rt
-    dx_rt="$(find_dx_rt)"
-    if [ -z "${dx_rt}" ]; then
-        echo "Skipping NPU setup: no dx_rt checkout found. Pass --dx_rt PATH to enable it."
-        return
-    fi
-    echo "Using dx_rt: ${dx_rt}"
-
-    # Build in a copy: the cmake target drops _pydxrt.so back into its source tree
-    if "${FASTAPI_DIR}"/venv/bin/python -c 'import dx_engine' > /dev/null 2>&1; then
-        echo "Already present: dx_engine"
-    else
-        echo "Building dx_engine (python binding for DX-RT) ..."
-        mkdir -p "${BUILD_DIR}"
-        rm -rf "${BUILD_DIR}/dx_engine_src"
-        cp -r "${dx_rt}/python_package" "${BUILD_DIR}/dx_engine_src"
-        rm -f "${BUILD_DIR}"/dx_engine_src/src/dx_engine/capi/_pydxrt*.so
-        # Without DX_ROOT_DIR the build cannot find lib/include and fails
-        CMAKE_ARGS="-DDX_ROOT_DIR=${dx_rt}" \
-            "${FASTAPI_DIR}"/venv/bin/pip install "${BUILD_DIR}/dx_engine_src"
-    fi
-
-    echo "Fetching the .dxnn NPU models ..."
-    if ! (cd "${FASTAPI_DIR}" && ./setup_deepx_models.sh --deepx-path "${FASTAPI_DIR}/deepx"); then
-        echo "Error: failed to fetch the NPU models."
-        return 1
-    fi
-
-    # run.sh enables SETUP_NPU only when this file exists
+write_deepx_env() {
+    # M1 ~1.92GiB: TASK_MAX_LOAD=3 overflows when loading PP-OCRv5 server models.
     local env_file="${FASTAPI_DIR}/deepx_env.sh"
-    local inter=1 intra=2 dynamic=1 max_load=3 in_workers=2 out_workers=4
+    local inter=1 intra=1 dynamic=1 max_load=1 in_workers=1 out_workers=1
     if [ -f "${FASTAPI_DIR}/.env.deepx" ]; then
         # shellcheck disable=SC1091
         source "${FASTAPI_DIR}/.env.deepx"
@@ -292,8 +290,8 @@ setup_npu() {
     fi
     cat > "${env_file}" <<ENVEOF
 #!/bin/bash
-# DEEPX NPU environment for the OCR server. Written by build.sh; run.sh sources
-# this file and enables SETUP_NPU when it exists. Values come from .env.deepx.
+# Conservative NPU buffers: M1 has 1.92GiB. Loading every PP-OCRv5
+# server model with TASK_MAX_LOAD=3 overflows device memory.
 export CUSTOM_INTER_OP_THREADS_COUNT=${inter}
 export CUSTOM_INTRA_OP_THREADS_COUNT=${intra}
 export DXRT_DYNAMIC_CPU_THREAD=${dynamic}
@@ -303,6 +301,62 @@ export NFH_OUTPUT_WORKER_THREADS=${out_workers}
 ENVEOF
     chmod +x "${env_file}"
     echo "Wrote deepx_env.sh (${inter} ${intra} ${dynamic} ${max_load} ${in_workers} ${out_workers})"
+}
+
+setup_npu() {
+    local dx_root
+    dx_root="$(find_libdxrt_prefix)"
+    if [ -z "${dx_root}" ]; then
+        echo "Error: libdxrt.so not found. Install DX-RT 3.3.0 first, or set DXRT_INSTALLED_DIR."
+        echo "  Skipping NPU would fall back to CPU PaddleOCR, which SIGSEGVs on this Firefly image."
+        return 1
+    fi
+    echo "Using installed DX-RT prefix: ${dx_root}"
+
+    local dx_rt
+    dx_rt="$(find_dx_rt)"
+    if [ -z "${dx_rt}" ]; then
+        echo "Error: no dx_rt v3.3.0 python_package found."
+        echo "  Pass --dx_rt PATH, or run scripts/setup_repro.sh (downloads tag v3.3.0)."
+        echo "  Do NOT pip install dx-engine==3.4.0 (needs driver >= 2.5.0; this board is 2.4.1)."
+        return 1
+    fi
+    echo "Using dx_rt sources: ${dx_rt}"
+
+    # Link against the *installed* libdxrt. Using the unbuilt GitHub tree as
+    # DX_ROOT_DIR yields _pydxrt.so with undefined dxrt_engine_get_bitmatch_mask.
+    local vpy="${FASTAPI_DIR}/venv/bin/python"
+    local need_engine=1
+    if "${vpy}" -c 'import dx_engine.capi._pydxrt; import dx_engine; raise SystemExit(0 if str(getattr(dx_engine, "__version__", "")).startswith("3.3.0") else 1)' > /dev/null 2>&1; then
+        echo "Already present: dx_engine 3.3.0"
+        need_engine=0
+    fi
+    if "${vpy}" -c 'import dx_engine; raise SystemExit(0 if str(getattr(dx_engine, "__version__", "")).startswith("3.4") else 1)' > /dev/null 2>&1; then
+        echo "Removing dx-engine 3.4.x (incompatible with RT driver 2.4.1) ..."
+        "${FASTAPI_DIR}/venv/bin/pip" uninstall -y dx-engine dx_engine || true
+        need_engine=1
+    fi
+    if [ "${need_engine}" = 1 ]; then
+        echo "Building dx_engine 3.3.0 against ${dx_root} ..."
+        mkdir -p "${BUILD_DIR}"
+        rm -rf "${BUILD_DIR}/dx_engine_src"
+        cp -r "${dx_rt}/python_package" "${BUILD_DIR}/dx_engine_src"
+        rm -f "${BUILD_DIR}"/dx_engine_src/src/dx_engine/capi/_pydxrt*.so
+        CMAKE_ARGS="-DDX_ROOT_DIR=${dx_root}" \
+            "${FASTAPI_DIR}/venv/bin/pip" install --force-reinstall "${BUILD_DIR}/dx_engine_src"
+        if ! "${vpy}" -c 'import dx_engine.capi._pydxrt' > /dev/null 2>&1; then
+            echo "Error: dx_engine built but _pydxrt does not import. Check CMAKE_ARGS / libdxrt."
+            return 1
+        fi
+    fi
+
+    echo "Fetching the .dxnn NPU models ..."
+    if ! (cd "${FASTAPI_DIR}" && ./setup_deepx_models.sh --deepx-path "${FASTAPI_DIR}/deepx"); then
+        echo "Error: failed to fetch the NPU models."
+        return 1
+    fi
+
+    write_deepx_env
 
     # Fonts used when the server renders OCR overlays
     mkdir -p "${FASTAPI_DIR}/deepx/engine/fonts"

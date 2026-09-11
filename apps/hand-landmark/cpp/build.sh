@@ -2,6 +2,11 @@
 set -e
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+if [ -f "${REPO_ROOT}/toolchain.env" ]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/toolchain.env"
+fi
 BUILD_DIR="${SCRIPT_DIR}/build"
 
 clean_build=false

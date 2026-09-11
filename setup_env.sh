@@ -2,6 +2,10 @@
 set -e 
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)" 
+if [ -f "${REPO_ROOT}/toolchain.env" ]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/toolchain.env"
+fi
 
 ARCH=$(uname -m) 
 
@@ -61,7 +65,19 @@ echo "========================================"
 VENV_PY="$REPO_ROOT/.venv/bin/python" 
 VENV_PIP="$REPO_ROOT/.venv/bin/pip" 
 PY_TAG="cp$("$VENV_PY" -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')" 
-DXRT_ROOT="${DXRT_DIR:-${DX_RT:-$HOME/dx_rt}}" 
+# Prefer the v3.3.0 python_package (driver 2.4.1). Never install PyPI 3.4.0.
+DXRT_ROOT="${DXRT_DIR:-${DX_RT_PATH:-${DX_RT:-}}}"
+if [ -z "${DXRT_ROOT}" ] || [ ! -d "${DXRT_ROOT}/python_package" ]; then
+   for _cand in \
+       "${REPO_ROOT}/apps/paddle-ocr-web/python/.cache/dx_rt-3.3.0" \
+       "${HOME}/dx_rt"; do
+       if [ -d "${_cand}/python_package" ]; then
+           DXRT_ROOT="${_cand}"
+           break
+       fi
+   done
+fi
+DXRT_ROOT="${DXRT_ROOT:-$HOME/dx_rt}" 
 DXRT_WHEEL_DIRS=( 
    "/usr/share/libdxrt-bin/python" 
    "/usr/local/share/libdxrt-bin/python" 
@@ -69,10 +85,10 @@ DXRT_WHEEL_DIRS=(
 
 # Prefer a wheel tagged for this architecture, fall back to any wheel for this interpreter. 
 DXRT_WHEEL="" 
-for pat in "dx_engine-*-${PY_TAG}-*${ARCH}.whl" "dx_engine-*-${PY_TAG}-*.whl"; do 
+for pat in "dx_engine-3.3.0-*-${PY_TAG}-*${ARCH}.whl" "dx_engine-3.3*-${PY_TAG}-*${ARCH}.whl" "dx_engine-*-${PY_TAG}-*${ARCH}.whl" "dx_engine-*-${PY_TAG}-*.whl"; do 
    for dir in "${DXRT_WHEEL_DIRS[@]}" "${DXRT_ROOT}"; do 
        [ -d "${dir}" ] || continue 
-       DXRT_WHEEL=$(find "${dir}" -name "${pat}" 2>/dev/null | head -n 1) 
+       DXRT_WHEEL=$(find "${dir}" -name "${pat}" ! -name '*3.4*' 2>/dev/null | head -n 1) 
        [ -n "${DXRT_WHEEL}" ] && break 2 
    done 
 done 
@@ -83,11 +99,14 @@ elif [ -n "${DXRT_WHEEL}" ]; then
    # Do not abort the whole setup (set -e) if this one install fails. 
    "$VENV_PIP" install "${DXRT_WHEEL}" \
        || echo "Warning: failed to install $(basename "${DXRT_WHEEL}")." 
-elif [ -f "${DXRT_ROOT}/python_package/setup.py" ]; then 
-   # Source build: compile the bindings against the installed libdxrt. 
-   # Without DX_ROOT_DIR the build cannot find lib/include and fails. 
-   echo "Building dx_engine from ${DXRT_ROOT}/python_package ..." 
-   CMAKE_ARGS="-DDX_ROOT_DIR=${DXRT_ROOT}" "$VENV_PIP" install "${DXRT_ROOT}/python_package" \
+elif [ -d "${DXRT_ROOT}/python_package" ]; then
+   # Link against the *installed* libdxrt, not an unbuilt GitHub tree.
+   DX_ROOT_FOR_ENGINE="${DXRT_INSTALLED_DIR:-${DXRT_ROOT}}"
+   if [ ! -e "${DX_ROOT_FOR_ENGINE}/lib/libdxrt.so" ]; then
+       [ -e /usr/local/lib/libdxrt.so ] && DX_ROOT_FOR_ENGINE=/usr/local
+   fi
+   echo "Building dx_engine 3.3.0 from ${DXRT_ROOT}/python_package (DX_ROOT_DIR=${DX_ROOT_FOR_ENGINE}) ..."
+   CMAKE_ARGS="-DDX_ROOT_DIR=${DX_ROOT_FOR_ENGINE}" "$VENV_PIP" install "${DXRT_ROOT}/python_package" \
        || echo "Warning: failed to build dx_engine from ${DXRT_ROOT}/python_package." 
 else 
    echo "========================================" 
