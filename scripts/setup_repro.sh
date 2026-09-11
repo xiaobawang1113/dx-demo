@@ -23,7 +23,7 @@ ok() { echo "OK  $*"; }
 step() { echo; echo "======== $* ========"; }
 
 need_cmd() {
-    command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1 （请先装好与本机一致的编译/运行依赖，不要随便 apt 拆 hold）"
+    command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1 （请在目标机用包管理器装好依赖。系统版本不必一致；Firefly 镜像若有 apt hold，不要拆 hold）"
 }
 
 check_sdk() {
@@ -56,7 +56,7 @@ check_host_tools() {
         || missing+=("libopencv-dev")
     pkg-config --exists Qt5Widgets 2>/dev/null || missing+=("qtbase5-dev")
     if [ "${#missing[@]}" -gt 0 ]; then
-        die "缺少: ${missing[*]}。Firefly 镜像上不要 apt 拆 hold，用与本机相同的已装包。"
+        die "缺少: ${missing[*]}。请在目标机自行安装（系统版本不必和开发板一致）。若该机是带 apt hold 的 Firefly 镜像，不要拆 hold。"
     fi
     ok "gcc/cmake/OpenCV/Qt5 可用"
 }
@@ -70,26 +70,37 @@ setup_assets() {
 }
 
 setup_poppler() {
-    step "解压与本机 hold 匹配的 poppler-utils ${POPPLER_VER}（不走 apt）"
+    step "准备 pdftoppm（系统版本不必一致）"
     mkdir -p "${CACHE}"
     if [ -x "${POPPLER_DIR}/usr/bin/pdftoppm" ]; then
-        ok "poppler 已存在"
+        ok "缓存 poppler 已存在"
         return
     fi
-    if [ "$(uname -m)" != "aarch64" ]; then
-        echo "WARN: 非 aarch64，跳过 arm64 poppler 解压。x86 请自行保证 pdftoppm 与系统 libpoppler 匹配。"
+    local os_id="" os_ver=""
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        os_id="$(. /etc/os-release && echo "${ID:-}")"
+        os_ver="$(. /etc/os-release && echo "${VERSION_ID:-}")"
+    fi
+    # Only this combo matches the Firefly held libpoppler118; other OS uses system pdftoppm.
+    if [ "$(uname -m)" = "aarch64" ] && [ "${os_id}" = "ubuntu" ] && [ "${os_ver}" = "22.04" ]; then
+        local deb="${CACHE}/poppler-utils_${POPPLER_VER}_arm64.deb"
+        local url="http://ports.ubuntu.com/ubuntu-ports/pool/main/p/poppler/poppler-utils_${POPPLER_VER}_arm64.deb"
+        if [ ! -f "${deb}" ]; then
+            curl -fL --retry 5 --retry-delay 2 -o "${deb}" "${url}" \
+                || die "下载 poppler deb 失败: ${url}"
+        fi
+        mkdir -p "${POPPLER_DIR}"
+        dpkg-deb -x "${deb}" "${POPPLER_DIR}"
+        [ -x "${POPPLER_DIR}/usr/bin/pdftoppm" ] || die "poppler 解压后没有 pdftoppm"
+        ok "POPPLER_PATH=${POPPLER_DIR}/usr/bin（Ubuntu 22.04 aarch64 缓存解压，不走 apt）"
         return
     fi
-    local deb="${CACHE}/poppler-utils_${POPPLER_VER}_arm64.deb"
-    local url="http://ports.ubuntu.com/ubuntu-ports/pool/main/p/poppler/poppler-utils_${POPPLER_VER}_arm64.deb"
-    if [ ! -f "${deb}" ]; then
-        curl -fL --retry 5 --retry-delay 2 -o "${deb}" "${url}" \
-            || die "下载 poppler deb 失败: ${url}"
+    if command -v pdftoppm >/dev/null 2>&1; then
+        ok "使用系统 pdftoppm: $(command -v pdftoppm)"
+        return
     fi
-    mkdir -p "${POPPLER_DIR}"
-    dpkg-deb -x "${deb}" "${POPPLER_DIR}"
-    [ -x "${POPPLER_DIR}/usr/bin/pdftoppm" ] || die "poppler 解压后没有 pdftoppm"
-    ok "POPPLER_PATH=${POPPLER_DIR}/usr/bin"
+    echo "WARN: 没有 pdftoppm。图片 OCR 仍可用；PDF 需要目标机自己安装 poppler-utils（版本跟该机系统走）。"
 }
 
 setup_dx_rt_src() {
@@ -204,16 +215,16 @@ print_run() {
   ./scripts/run_drone_1.sh
 
 注意:
-  - 分辨率 1920x1080
-  - 摄像头默认 /dev/video${DX_CAMERA_IDX:-1}
-  - OCR 用 NPU + --use-server --lazy-load；CPU PaddleOCR 在本板镜像上会 SIGSEGV
-  - 不要 apt 安装 poppler-utils / python3-dev（Firefly hold）
+  - 必须一致的是 DX-RT ${EXPECTED_DXRT} / dx-engine 3.3.0 / 驱动 ${EXPECTED_DRIVER}，不是 Ubuntu 版本
+  - 摄像头当前 ${DX_CAMERA_DEV}（不对就 export DX_CAMERA_IDX=N）
+  - OCR 用 NPU + --use-server --lazy-load；不要装 dx-engine==3.4.0
+  - Firefly 镜像不要 apt 拆 hold；其他系统按该机包管理器安装依赖即可
   - 不要对含 app.py / ocr_service.py / run.sh 的命令行做泛匹配 pkill
 EOF
 }
 
 main() {
-    echo "Reproduce Firefly RK3588 + DX-RT ${EXPECTED_DXRT} demo tree"
+    echo "Reproduce DX-RT ${EXPECTED_DXRT} demo tree (OS/board need not match the Firefly image)"
     echo "ROOT=${ROOT}"
     check_sdk
     check_host_tools

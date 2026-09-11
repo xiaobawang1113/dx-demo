@@ -10,7 +10,9 @@ fi
 ARCH=$(uname -m) 
 
 echo "========================================" 
-echo "NOTE: APT dependencies must be installed manually:" 
+echo "NOTE: Install build deps on THIS machine if they are missing."
+echo "      OS/distro need not match the Firefly image."
+echo "      On Firefly images with apt holds, do not unhold/apt-get those packages."
 echo "sudo apt-get update" 
 if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then 
    echo "sudo apt-get install -y python3-venv python3-pip cmake build-essential libgl1-mesa-glx python3-pyqt5" 

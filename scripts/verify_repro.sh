@@ -49,7 +49,7 @@ fi
 if [ -x "${ROOT}/.venv/bin/python" ]; then
     "${ROOT}/.venv/bin/python" -c 'from PyQt5.QtWidgets import QApplication' 2>/dev/null \
         && ok "PyQt5（启动器）" \
-        || warn "PyQt5 导入失败：aarch64 需 --system-site-packages + 系统 python3-pyqt5"
+        || warn "PyQt5 导入失败。有系统 python3-pyqt5 时用 --system-site-packages；其他系统可 pip 装 PyQt5"
 fi
 
 FASTAPI="${ROOT}/apps/paddle-ocr-web/python/PaddleOCR-deepx/deploy/fastapi"
@@ -77,11 +77,16 @@ if [ -f "${FASTAPI}/deepx_env.sh" ]; then
         && ok "deepx_env.sh TASK_MAX_LOAD=1" \
         || bad "deepx_env.sh 的 TASK_MAX_LOAD 必须是 1（M1 约 1.92GiB，3 会撑爆）"
 else
-    bad "缺 deepx_env.sh（run.sh 看不到它就会走 CPU，本板 CPU PaddleOCR 会 SIGSEGV）"
+    bad "缺 deepx_env.sh（run.sh 看不到它就会走 CPU；请保持 NPU 路径）"
 fi
 POP="${ROOT}/apps/paddle-ocr-web/python/.cache/poppler-utils-22.02.0-2ubuntu0.3/usr/bin/pdftoppm"
-[ -x "${POP}" ] && ok "poppler pdftoppm（不解 hold、不走 apt）" \
-    || warn "缺解压版 poppler；PDF OCR 会失败（aarch64 由 setup_repro.sh 解 deb）"
+if [ -x "${POP}" ]; then
+    ok "poppler pdftoppm（缓存）"
+elif command -v pdftoppm >/dev/null 2>&1; then
+    ok "poppler pdftoppm（系统 $(command -v pdftoppm)）"
+else
+    warn "没有 pdftoppm：图片 OCR 可用，PDF 需要目标机安装 poppler-utils"
+fi
 
 [ -x "${ROOT}/apps/drone/cpp/build/drone_mixformer" ] && ok "drone_mixformer" \
     || bad "未编译 drone_mixformer"
