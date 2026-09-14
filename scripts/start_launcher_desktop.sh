@@ -5,6 +5,7 @@ if [ -f "${ROOT_DIR}/toolchain.env" ]; then
     # shellcheck disable=SC1091
     source "${ROOT_DIR}/toolchain.env"
 fi
+unset DXRT_TASK_MAX_LOAD
 export DISPLAY="${DISPLAY:-:0}"
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"

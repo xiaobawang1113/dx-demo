@@ -5,6 +5,9 @@ if [ -f "${ROOT_DIR}/toolchain.env" ]; then
     # shellcheck disable=SC1091
     source "${ROOT_DIR}/toolchain.env"
 fi
+# OCR sets this to 1 in deepx_env.sh. A leftover value of 1 here is inherited
+# by every demo the launcher starts and cuts NPU pipeline buffers to 1/3.
+unset DXRT_TASK_MAX_LOAD
 export DISPLAY="${DISPLAY:-:0}"
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 cd "$(dirname "$0")/../launcher"
