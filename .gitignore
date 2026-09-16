@@ -120,11 +120,12 @@ apps/*/python/.cache/
 apps/*/cpp/sfa3d/dataset/
 apps/*/*/build/
 
-# OCR Web: keep adapted source, drop clones' venv / NPU weights / caches
+# OCR Web: upstream fetched at build time; board diff lives in board/overlay/
 apps/paddle-ocr-web/python/.venv/
 apps/paddle-ocr-web/python/.cache/
 apps/paddle-ocr-web/python/.build/
-apps/paddle-ocr-web/python/PP-OCRv5_Online_demo-deepx/.git/
+apps/paddle-ocr-web/python/PP-OCRv5_Online_demo-deepx/
+apps/paddle-ocr-web/python/PaddleOCR-deepx/
 apps/paddle-ocr-web/python/PaddleOCR-deepx/deploy/fastapi/venv/
 apps/paddle-ocr-web/python/PaddleOCR-deepx/deploy/fastapi/deepx/engine/model_files/
 apps/paddle-ocr-web/python/PaddleOCR-deepx/deploy/fastapi/deepx/.temp/

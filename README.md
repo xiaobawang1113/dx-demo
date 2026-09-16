@@ -123,6 +123,6 @@ source toolchain.env
 | `launcher/` | PyQt5 启动器 |
 | `apps/drone/` | MixFormer 目标跟踪 |
 | `apps/hand-landmark/` | 手势 |
-| `apps/paddle-ocr-web/` | PP-OCRv5 Web |
+| `apps/paddle-ocr-web/` | PP-OCRv5 Web（[upstream.lock + overlay](apps/paddle-ocr-web/README.md)，不 vendoring 上游） |
 | `apps/yolo26/`、`apps/yolo-multi/` | 检测 |
 | `apps/depth/`、`apps/automotive/` | 深度 / 自动驾驶 |

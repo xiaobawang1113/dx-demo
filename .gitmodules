@@ -1,12 +1,12 @@
-[submodule "dx-ocr/PP-OCRv5_Online_demo-deepx"]
-	path = dx-ocr/PP-OCRv5_Online_demo-deepx
-	url = https://github.com/DEEPX-AI/PP-OCRv5_Online_demo-deepx.git
-[submodule "dx-ocr/PaddleOCR-deepx"]
-	path = dx-ocr/PaddleOCR-deepx
-	url = https://github.com/DEEPX-AI/PaddleOCR-deepx.git
-[submodule "paddle-ocr/PP-OCRv5_Online_demo-deepx"]
-	path = paddle-ocr/PP-OCRv5_Online_demo-deepx
-	url = https://github.com/DEEPX-AI/PP-OCRv5_Online_demo-deepx.git
-[submodule "paddle-ocr/PaddleOCR-deepx"]
-	path = paddle-ocr/PaddleOCR-deepx
-	url = https://github.com/DEEPX-AI/PaddleOCR-deepx.git
+# Optional git submodules (same URLs as upstream.lock / deepx-mskang/dx-demo).
+# Default workflow: ./apps/paddle-ocr-web/fetch_upstream.sh + board/overlay
+# instead of `git submodule update`.
+#
+# [submodule "apps/paddle-ocr-web/python/PP-OCRv5_Online_demo-deepx"]
+#	path = apps/paddle-ocr-web/python/PP-OCRv5_Online_demo-deepx
+#	url = https://github.com/DEEPX-AI/PP-OCRv5_Online_demo-deepx.git
+#	branch = deepx
+# [submodule "apps/paddle-ocr-web/python/PaddleOCR-deepx"]
+#	path = apps/paddle-ocr-web/python/PaddleOCR-deepx
+#	url = https://github.com/DEEPX-AI/PaddleOCR-deepx.git
+#	branch = deepx

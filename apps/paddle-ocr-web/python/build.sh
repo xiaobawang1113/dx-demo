@@ -131,8 +131,15 @@ clone_if_missing() {
     tar -xzf "${tgz}" -C "${dir}" --strip-components=1
 }
 
-clone_if_missing "${WEB_DIR}" "${WEB_REPO}"
-clone_if_missing "${SERVER_DIR}" "${SERVER_REPO}"
+OCR_APP_DIR="${SCRIPT_DIR}/.."
+if [ -x "${OCR_APP_DIR}/fetch_upstream.sh" ] && [ -x "${OCR_APP_DIR}/apply_board_overlay.sh" ]; then
+    echo "Fetching pinned upstream OCR repos (see apps/paddle-ocr-web/upstream.lock) ..."
+    bash "${OCR_APP_DIR}/fetch_upstream.sh"
+    bash "${OCR_APP_DIR}/apply_board_overlay.sh"
+else
+    clone_if_missing "${WEB_DIR}" "${WEB_REPO}"
+    clone_if_missing "${SERVER_DIR}" "${SERVER_REPO}"
+fi
 materialize_lfs_files "${WEB_DIR}"
 
 # --- 2. Web UI venv -----------------------------------------------------------
