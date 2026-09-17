@@ -33,7 +33,7 @@ cd apps/paddle-ocr-web
 
 - `ocr_service.py`：poppler 缓存路径、M1 上可选 640/960/doc 模型加载策略
 - `run.sh`：POPPLER_PATH、NPU env
-- `deepx_env.sh` / `.env.deepx`：`DXRT_TASK_MAX_LOAD=1`（仅 OCR 进程）
+- `deepx_env.sh` / `.env.deepx`：`DXRT_TASK_MAX_LOAD=1`（NPU 设备显存）；CPU 侧为上游默认 intra=2、NFH 2/4
 - `deepx/engine/paddleocr.py`：未加载 960 时 `det_router` 回退到 640（避免大图 KeyError）
 - `app.py`：Gradio 路径 / 重启相关
 

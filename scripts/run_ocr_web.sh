@@ -52,8 +52,9 @@ fi
 export PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 export DISABLE_MODEL_SOURCE_CHECK=True
 export FLAGS_use_mkldnn=0
-export OMP_NUM_THREADS=1
-export PADDLE_NUM_THREADS=1
+# NPU inference path; allow CPU-side parallelism (board RAM 4GB). Override if needed.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
+export PADDLE_NUM_THREADS="${PADDLE_NUM_THREADS:-4}"
 # --lazy-load: do not construct PaddleOCR at startup (CPU init SIGSEGVs here).
 # NPU models load on the first deepx=true request via dx_engine 3.3.0.
 OCR_MODEL_ARGS=(--use-server --lazy-load)

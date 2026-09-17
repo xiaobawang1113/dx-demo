@@ -42,7 +42,8 @@ if [ "$DX_BACKEND" == "python" ]; then
 else
     echo "Running C++ backend..."
     cd cpp
-    ./build/depth-demo -m "${WORKSPACE}/models/depth/depth_anything_v2_vits_294x518_sim.dxnn" -s --exit-btn -c "${DX_CAMERA_IDX:-0}" --backend v4l2 --camera-fourcc MJPG
+    ./build/depth-demo -m "${WORKSPACE}/models/depth/depth_anything_v2_vits_294x518_sim.dxnn" -s --exit-btn -c "${DX_CAMERA_IDX:-0}" \
+        --backend "${DX_CAMERA_BACKEND:-v4l2}" --camera-fourcc "${DX_CAMERA_FOURCC:-MJPG}"
     #./build/depth-demo -m "${WORKSPACE}/models/depth/depth_anything_v2_vits_294x518_sim.dxnn" -s
 
 fi

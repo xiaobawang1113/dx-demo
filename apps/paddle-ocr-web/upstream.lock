@@ -1,7 +1,6 @@
-# Pin DEEPX OCR Web upstream (same repos as deepx-mskang/dx-demo).
-# Update commit when you intentionally bump upstream; run fetch_upstream.sh after.
-#
-# Branch is used when COMMIT is empty. Prefer pinning COMMIT for reproducible builds.
+# DEEPX OCR Web upstream (same repos as deepx-mskang/dx-demo).
+# Compatible Mode: leave COMMIT empty to track branch deepx on deploy.
+# Optional: pin COMMIT for regression tests only — not required for customer boards.
 
 PP-OCRv5_Online_demo-deepx_REPO=https://github.com/DEEPX-AI/PP-OCRv5_Online_demo-deepx.git
 PP-OCRv5_Online_demo-deepx_BRANCH=deepx

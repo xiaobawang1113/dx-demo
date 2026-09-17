@@ -269,7 +269,6 @@ find_dx_rt() {
     local candidate
     for candidate in \
         "${DX_RT_PATH}" \
-        "${SCRIPT_DIR}/.cache/dx_rt-3.3.0" \
         "${HOME}/Desktop/deepx/SDK/dx-all-suite/dx-runtime/dx_rt" \
         "${HOME}/deepx/SDK/dx-all-suite/dx-runtime/dx_rt" \
         "${HOME}/dx-all-suite/dx-runtime/dx_rt" \
@@ -279,12 +278,19 @@ find_dx_rt() {
             return
         fi
     done
+    for candidate in "${SCRIPT_DIR}"/.cache/dx_rt-*; do
+        [ -d "${candidate}" ] || continue
+        if [ -f "${candidate}/python_package/pyproject.toml" ] || [ -f "${candidate}/python_package/setup.py" ]; then
+            echo "${candidate}"
+            return
+        fi
+    done
 }
 
 write_deepx_env() {
     # M1 ~1.92GiB: TASK_MAX_LOAD=3 overflows when loading PP-OCRv5 server models.
     local env_file="${FASTAPI_DIR}/deepx_env.sh"
-    local inter=1 intra=1 dynamic=1 max_load=1 in_workers=1 out_workers=1
+    local inter=1 intra=2 dynamic=1 max_load=1 in_workers=2 out_workers=4
     if [ -f "${FASTAPI_DIR}/.env.deepx" ]; then
         # shellcheck disable=SC1091
         source "${FASTAPI_DIR}/.env.deepx"
@@ -297,8 +303,7 @@ write_deepx_env() {
     fi
     cat > "${env_file}" <<ENVEOF
 #!/bin/bash
-# Conservative NPU buffers: M1 has 1.92GiB. Loading every PP-OCRv5
-# server model with TASK_MAX_LOAD=3 overflows device memory.
+# NPU: TASK_MAX_LOAD=${max_load} (M1 device memory). CPU workers from .env.deepx.
 export CUSTOM_INTER_OP_THREADS_COUNT=${inter}
 export CUSTOM_INTRA_OP_THREADS_COUNT=${intra}
 export DXRT_DYNAMIC_CPU_THREAD=${dynamic}
@@ -334,17 +339,12 @@ setup_npu() {
     # DX_ROOT_DIR yields _pydxrt.so with undefined dxrt_engine_get_bitmatch_mask.
     local vpy="${FASTAPI_DIR}/venv/bin/python"
     local need_engine=1
-    if "${vpy}" -c 'import dx_engine.capi._pydxrt; import dx_engine; raise SystemExit(0 if str(getattr(dx_engine, "__version__", "")).startswith("3.3.0") else 1)' > /dev/null 2>&1; then
-        echo "Already present: dx_engine 3.3.0"
+    if "${vpy}" -c 'import dx_engine.capi._pydxrt' > /dev/null 2>&1; then
+        echo "Already present: dx_engine ($("${vpy}" -c 'import dx_engine; print(getattr(dx_engine,"__version__","?"))' 2>/dev/null | tail -1))"
         need_engine=0
     fi
-    if "${vpy}" -c 'import dx_engine; raise SystemExit(0 if str(getattr(dx_engine, "__version__", "")).startswith("3.4") else 1)' > /dev/null 2>&1; then
-        echo "Removing dx-engine 3.4.x (incompatible with RT driver 2.4.1) ..."
-        "${FASTAPI_DIR}/venv/bin/pip" uninstall -y dx-engine dx_engine || true
-        need_engine=1
-    fi
     if [ "${need_engine}" = 1 ]; then
-        echo "Building dx_engine 3.3.0 against ${dx_root} ..."
+        echo "Building dx_engine against installed libdxrt (${dx_root}) ..."
         mkdir -p "${BUILD_DIR}"
         rm -rf "${BUILD_DIR}/dx_engine_src"
         cp -r "${dx_rt}/python_package" "${BUILD_DIR}/dx_engine_src"
