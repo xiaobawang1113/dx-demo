@@ -133,6 +133,9 @@ apps/paddle-ocr-web/.ocr-api.log
 apps/paddle-ocr-web/.ocr-ui.log
 apps/paddle-ocr-web/.browser.pid
 
+# Launcher async ready markers (runtime)
+launcher/ready/
+
 # Model Zoo: browser PID recorded by scripts/run_modelzoo.sh
 apps/model-zoo/.browser.pid
 apps/model-zoo/browser-profile/
